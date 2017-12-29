@@ -20,7 +20,7 @@ First write by raysmile, Second modify by maobo
 #include <unistd.h>
 #include <map>
 #include <stdint.h>
-
+#include "bch.h"
 using namespace std;
 //#define DEBUG
 
@@ -34,6 +34,11 @@ using namespace std;
 #define debug4(v1,v2,v3,v4) ;
 #endif
 
+#define CONFIG_M 8
+#define CONFIG_T 13
+#define CODE_LENGTH (CONFIG_M * CONFIG_T / 8)
+
+
 const	int	debug		=	1;
 const	long	BLOCK_SIZE	=	512;
 const	long 	MAX_BLOCK	=	256;
@@ -44,29 +49,31 @@ const	long	READ		=	1;
 struct bch_control *bch;
 std::map<std::string, int> hash_container;
 std::map<std::string, int> bch_container;
+
 //trace struct
 typedef	struct	_io_trace
 {
-	char *fingerprint;
-	double			time;
-	unsigned long    	blkno;
-	int				blkcount;
-	unsigned int	flag;
+		char *fingerprint;
+		char bchcode[2* CODE_LENGTH + 1];
+		double			time;
+		unsigned long    	blkno;
+		int				blkcount;
+		unsigned int	flag;
 }io_trace;
 
 typedef	struct	_io_time
 {
-	double	start_time;
-	double	end_time;
-	double	elpsd_time;
-	unsigned int	flag;
+		double	start_time;
+		double	end_time;
+		double	elpsd_time;
+		unsigned int	flag;
 }io_time;
 
 //signal
 typedef struct _sig_data
 {
-	int 		number;
-	struct	aiocb64	*aio_req;
+		int 		number;
+		struct	aiocb64	*aio_req;
 }sig_data;
 
 //functions
@@ -74,18 +81,19 @@ double get_time(void);
 void do_io();
 //void callback(sigval_t sigval);
 void aio_complete_note( int signo, siginfo_t *info, void *context );
-int trace_reader(char *file_name, io_trace *trace, unsigned long max_trace_num, float timescale, float rangescale);
+int trace_reader();
 void usage(void);
 void deal_by_num();
 void deal_by_time();
 unsigned long trace_stat(char *file_name, unsigned long  *max_dev_addr);
+void ByteToHexStr(const unsigned char *source, char *dest, int sourceLen);
 
 //define
 struct aiocb64 my_aiocb[MAX_TRACE_COUNT];
 sig_data	my_data[MAX_TRACE_COUNT];
 io_trace	trace[MAX_TRACE_COUNT];
 io_time		my_time[MAX_TRACE_COUNT];
-static	int 		total=0;
+static	unsigned long total=0;
 static	double	start=0;
 char 	*exit_code;
 
@@ -97,11 +105,15 @@ char 	myname[255];
 char	dev_name[255];
 int 	deal_time,deal_num;
 int		trace_num;
-float		timescale;
-float		rangescale;
+double		timescale;
+double		rangescale;
 //unsigned long rangescale;
 double trace_end_time =0 ;
 int trace_type = 0;
+int schemes_type=0;
+
+unsigned long write_num = 0;
+unsigned long	no_replicate = 0;
 
 unsigned long   max_trace_addr;
 
@@ -109,6 +121,8 @@ int main(int argc,char **argv)
 {
 	int i=0;
 	FILE *fp;
+
+	bch = init_bch(CONFIG_M, CONFIG_T, 0);
 
 	if(argc==1)
 	{
@@ -191,7 +205,8 @@ int main(int argc,char **argv)
 							usage();
 							exit(0);
 						}
-						dev_size=atoi(argv[i]);
+						dev_size = atoi(argv[i]);
+						dev_size = 1024 * 1024 * dev_size;
 						if (dev_size<0)
 						{
 							printf("wrong capacity!\n");
@@ -250,6 +265,22 @@ int main(int argc,char **argv)
 						}
 						break;
 
+					case 'h':
+
+						i++;
+						if(i>=argc)
+						{
+							printf("bad scheme type:\"%s\".\n",argv[i-1]);
+							usage();
+							exit(0);
+						}
+						schemes_type=atoi(argv[i]);
+						if (schemes_type<0)
+						{
+							printf("wrong scheme type!\n");
+							exit(0);
+						}
+						break;
 
 					default:
 						printf("bad parameter:\"%s\".\n",argv[i]);
@@ -316,17 +347,38 @@ int main(int argc,char **argv)
 		dev_size=15*1024*1024;
 		printf("no raid capacity input, use default:[15GB]\n");
 	}
+
 	if(trace_type == 0){
 		printf("MSR trace.\n");
 	}else if(trace_type == 1) {
-		printf("Home trace in FIU.\n");
+		printf("Home trace in FIU\n");
+		if(schemes_type == 0){
+			printf("Use traditional hash algorithm!\n");
+		}
+		else if(schemes_type == 1){
+			printf("Use EaD algorithm!\n");
+		}
+		else{
+			printf("Wrong schemes type!\n");
+			exit(9);
+		}
 	}else if(trace_type == 2) {
-		printf("Mail trace or web trace in FIU.\n");
+		printf("Mail trace or web trace in FIU\n");
+		if(schemes_type == 0){
+			printf("Use traditional hash algorithm!\n");
+		}
+		else if(schemes_type == 1){
+			printf("Use EaD algorithm!\n");
+		}
+		else{
+			printf("Wrong schemes type!\n");
+			exit(9);
+		}
 	}else{
 		printf("Error trace type!\n");
 		exit(0);
 	}
-
+	cout<<"device size: "<<dev_size<<"KB"<<endl;
 	strcpy(dev_name,argv[argc]);
 	if(strlen(dev_name)==0)
 	{
@@ -344,15 +396,16 @@ int main(int argc,char **argv)
 	*exit_code=10;
 
 
-	trace_stat(trace_file_name, &max_trace_addr);
+	total = trace_stat(trace_file_name, &max_trace_addr);
 
 	//read trace file amd converte the trace adative to the raid capacity and intensity
 	//!!! rangescale needs to be re-implemented, it is not suitable now!
- 	//rangescale= (float)max_trace_addr /(dev_size * 1024 * 1024 *2) * 1.0;
- 	rangescale= (float)dev_size*2/max_trace_addr;
-       // cout<<"max"<<max_trace_addr;
-       cout<<"rangescale:"<<rangescale;
-	total=trace_reader(trace_file_name, trace, MAX_TRACE_COUNT, timescale, rangescale);
+	//rangescale= (float)max_trace_addr /(dev_size * 1024 * 1024 *2) * 1.0;
+	rangescale= (float)dev_size*2/max_trace_addr;
+
+	// cout<<"max"<<max_trace_addr;
+	cout<<"rangescale:"<<rangescale;
+	trace_reader();
 
 	//cout<<total<<"	records"<<endl;
 	printf("\nbenchmark is initialized, press any character to begin the evaluation...");
@@ -376,7 +429,7 @@ int main(int argc,char **argv)
 		total_size+=trace[i].blkcount*BLOCK_SIZE;
 		total_time+=my_time[i].elpsd_time;
 	}
-	cout<<"device size: "<<dev_size<<"KB"<<endl;
+
 	cout<<total<<" requests sent"<<"("<<total_size/1024<<"MB)"<<endl;
 //	cout<<"speed:  "<<total_size/1024/my_time[total].end_time<<" KB/s"<<endl;
 	cout<<"avg response time:"<<total_time/total*1000<<" ms"<<endl;
@@ -437,8 +490,9 @@ unsigned long trace_stat(char *file_name, unsigned long  *max_dev_addr)
 	int num;
 //	char rw_flag;
 	int dev_num;
+	int minor;
 	char fingerprint[300];
-
+	uint8_t hv[CODE_LENGTH + 1];
 
 ////////////////////////////////////////////////////////////////////////////////
 	if((fp=fopen(file_name, "r"))==NULL)
@@ -449,8 +503,6 @@ unsigned long trace_stat(char *file_name, unsigned long  *max_dev_addr)
 
 	while(1){
 		if (fgets(line, 400, fp) == NULL || count_threshold<=0) {
-
-
 			break;
 		}
 
@@ -469,37 +521,56 @@ unsigned long trace_stat(char *file_name, unsigned long  *max_dev_addr)
 			if(trace[i].blkcount>MAX_BLOCK)
 				trace[i].blkcount=MAX_BLOCK;
 		}else if(trace_type == 1 || trace_type == 2){ // FIU trace, 1 is homes, 2 are mail or web.
-			if (sscanf(line, "%llu %d %[^ ] %lu %d %c %d 0 %s\n", &time_stamp, &pid, process, &address/*lba*/, &num, &op_code,
-														&dev_num, fingerprint) != 8) {
+			if (sscanf(line, "%llu %d %[^ ] %lu %d %c %d %d %s\n", &time_stamp, &pid, process, &address/*lba*/, &num, &op_code,
+								 &dev_num, &minor, fingerprint) != 9) {
+				if(num != 8)
+					continue;
+
 				fprintf(stderr, "Wrong number of arguments for I/O trace event type\n");
 				fprintf(stderr, "line: %s", line);
 				exit(0);
 			}
-
+			if(num != 8)
+				continue;
 			length = 4096;
 			timestamp = (double)time_stamp / 1000000000;
 			if(total_count == 0){
-					fiu_start_time = timestamp;
+				fiu_start_time = timestamp;
 			}
-			trace[i].time=timestamp - fiu_start_time;
-			trace[i].time=trace[i].time / timescale;
+			trace[i].time = timestamp - fiu_start_time;
+			trace[i].time = trace[i].time / timescale;
 			trace[i].blkcount = 4096 / BLOCK_SIZE;
 			if(trace_type == 1) {
 				trace[i].fingerprint = (char *) malloc(257 * sizeof(char));
+				trace[i].fingerprint[256] = '\0';
 				memcpy(trace[i].fingerprint, fingerprint, 256);
+				memset(hv, 0, CODE_LENGTH + 1);
+				memset(trace[i].bchcode, 0, 2 * CODE_LENGTH + 1);
+				encode_bch(bch, (uint8_t *)trace[i].fingerprint, 256, hv);
+				ByteToHexStr(hv, trace[i].bchcode, CODE_LENGTH);
+				trace[i].bchcode[2 * CODE_LENGTH] = '\0';
 			}
 			else if(trace_type == 2) {
 				trace[i].fingerprint = (char *) malloc(33 * sizeof(char));
+				trace[i].fingerprint[32] = '\0';
 				memcpy(trace[i].fingerprint, fingerprint, 32);
+				memset(hv, 0, CODE_LENGTH + 1);
+				memset(trace[i].bchcode, 0, 2 * CODE_LENGTH + 1);
+				encode_bch(bch, (uint8_t *)trace[i].fingerprint, 32, hv);
+				ByteToHexStr(hv, trace[i].bchcode, CODE_LENGTH);
+				trace[i].bchcode[2 * CODE_LENGTH] = '\0';
+
 			}
+#if 0
+			printf("%lf,%lu,%d,%s\n", trace[i].time, address, trace[i].blkcount,fingerprint);
+#endif
 		}else{
 			fprintf(stderr, "Wrong trace number!\n");
 			exit(0);
 		}
 
 		trace[i].blkno=address;
-		trace[i].blkno =(unsigned long)(trace[i].blkno * rangescale);
-		trace[i].blkno =(trace[i].blkno*8)/8;
+
 
 #if 0
 		printf("devno=%d time=%s op=%c address=%ld length=%d\n", devno,time_str,op_code,address,length);
@@ -525,6 +596,7 @@ unsigned long trace_stat(char *file_name, unsigned long  *max_dev_addr)
 		else{
 			write_count++;
 			trace[i].flag=1;
+
 		}
 		if(length/BLOCK_SIZE>MAX_BLOCK)
 			length=BLOCK_SIZE*MAX_BLOCK;
@@ -547,78 +619,20 @@ unsigned long trace_stat(char *file_name, unsigned long  *max_dev_addr)
 
 	*max_dev_addr=max_address;
 	printf("max_address=%ld, total_count=%ld(iops=%lf), read_count=%ld(%lf%%), write_count=%ld(%lf%%)\n\n",
-		max_address, total_count, io_per_sec, read_count, read_prop * 100, write_count, (1-read_prop)*100);
-
-
+				 max_address, total_count, io_per_sec * timescale, read_count, read_prop * 100, write_count, (1-read_prop)*100);
 	fclose(fp);
 	return total_count;
 }
 
 
 //read and convert the trace file into memory
-int trace_reader(char *file_name, io_trace *trace, unsigned long max_trace_num, float timescale, float rangescale)
+int trace_reader()
 {
-	FILE	*fp	=	NULL;
-	char line[400];
 	int i=0;
-
-	int					devno;
-	unsigned long		   address;
-	int					length;
-	char				op_code;
-	char				time_str[20];
-	float				timestamp;
-
-
-	if((fp=fopen(file_name, "r"))==NULL)
-	{
-		cout<<"open trace file error:"<<file_name<<"can't open!"<<endl;
-		return 0;
+	for(; i < total; i++) {
+		trace[i].blkno = (unsigned long) (trace[i].blkno * rangescale);
+		trace[i].blkno = (trace[i].blkno * 8) / 8;
 	}
-
-	while(1){
-		if (fgets(line, 100, fp) == NULL || max_trace_num<=0) {
-			break;
-		}
-
-		if (sscanf(line, "%d,%ld,%d,%c,%s\n",&devno,&address,&length,&op_code,time_str) != 5) {
-			printf("devno=%d time=%s op=%c address=%ld length=%d\n", devno,time_str,op_code,address,length);
-			fprintf(stderr, "Wrong number of arguments for I/O trace event type\n");
-			fprintf(stderr, "line: %s", line);
-			exit(0);
-		}
-
-#if 0
-		printf("devno=%d time=%s op=%c address=%d length=%d\n", devno,time_str,op_code,address,length);
-#endif
-		//added by maobo 2007.11.2
-		//if(devno!=0)
-                  //      continue;
-
-
-
-		max_trace_num--;
-
-		timestamp=atof(time_str);
-		trace[i].time=timestamp;
-		trace[i].time=trace[i].time / timescale;
-
-		if(op_code=='R'||op_code=='r')
-			trace[i].flag=0;
-		else
-			trace[i].flag=1;
-
-		trace[i].blkno=address;
-		trace[i].blkno =(unsigned long)(trace[i].blkno * rangescale);
-		trace[i].blkno =(unsigned long)(trace[i].blkno*8)/8; //add by maobo
-//		trace[i].blkno =(unsigned long)(devno * rangescale + trace[i].blkno);
-	      //	cout<<"blkno:"<<trace[i].blkno<<",";
-                trace[i].blkcount=length /BLOCK_SIZE;
-                if(trace[i].blkcount>MAX_BLOCK)
-		trace[i].blkcount=MAX_BLOCK;
-		i++;
-	}
-
 	return i;
 }
 //callback
@@ -656,13 +670,13 @@ void aio_complete_note( int signo, siginfo_t *info, void *context )
 	if (info->si_signo == SIGIO) {
 		req = (sig_data *)info->si_value.sival_ptr;
 		/* Did the request complete? */
-	if (aio_error64(req->aio_req) == 0) {
-		/* Request completed successfully, get the return status */
-	      	ret = aio_return64(req->aio_req);
-		my_time[req->number].end_time=get_time()-start;
-		my_time[req->number].elpsd_time=my_time[req->number].end_time-my_time[req->number].start_time;
+		if (aio_error64(req->aio_req) == 0) {
+			/* Request completed successfully, get the return status */
+			ret = aio_return64(req->aio_req);
+			my_time[req->number].end_time=get_time()-start;
+			my_time[req->number].elpsd_time=my_time[req->number].end_time-my_time[req->number].start_time;
 //		printf("--we get here--used time =%lf---\n",my_time[req->number].elpsd_time);
-    		}
+		}
 	}
 	return;
 }
@@ -673,6 +687,7 @@ void do_io()
 	int i=0;
 	struct sigaction sig_act; //add by maobo
 	int fd=open(dev_name,O_RDWR|O_LARGEFILE);
+	std::string mid_str;
 	if(fd==-1)
 	{
 		cout<<"open "<<dev_name<<" error!"<<endl;
@@ -690,34 +705,35 @@ void do_io()
 	myaio.aio_buf=malloc(max*BLOCK_SIZE+1);
 	for(i=0;i<total;i++)
 	{
-			bzero((char *)&my_aiocb[i],sizeof(struct aiocb));
+		bzero((char *)&my_aiocb[i],sizeof(struct aiocb));
 
-			my_aiocb[i].aio_fildes = fd;
-			my_aiocb[i].aio_buf = myaio.aio_buf;
-			my_aiocb[i].aio_nbytes = trace[i].blkcount*BLOCK_SIZE;
-			my_aiocb[i].aio_offset = trace[i].blkno*BLOCK_SIZE;
+		my_aiocb[i].aio_fildes = fd;
+		my_aiocb[i].aio_buf = myaio.aio_buf;
+		my_aiocb[i].aio_nbytes = trace[i].blkcount*BLOCK_SIZE;
+		my_aiocb[i].aio_offset = trace[i].blkno*BLOCK_SIZE;
 
-			sigemptyset(&sig_act.sa_mask);//add by maobo
-  			sig_act.sa_flags = SA_SIGINFO;
- 			sig_act.sa_sigaction = aio_complete_note;
-			my_aiocb[i].aio_sigevent.sigev_notify = SIGEV_SIGNAL;
-			my_aiocb[i].aio_sigevent.sigev_signo = SIGIO;
+		sigemptyset(&sig_act.sa_mask);//add by maobo
+		sig_act.sa_flags = SA_SIGINFO;
+		sig_act.sa_sigaction = aio_complete_note;
+		my_aiocb[i].aio_sigevent.sigev_notify = SIGEV_SIGNAL;
+		my_aiocb[i].aio_sigevent.sigev_signo = SIGIO;
 
 
-			//link callback
-			if(i<1)
-                        {cout<<"L:"<<my_aiocb[i].aio_nbytes<<",";
-                         cout<<"blkno:"<<trace[i].blkno<<",";
-                         cout<<"offset:"<<my_aiocb[i].aio_offset<<endl;
-                        }
+		//link callback
+		if(i<1) {
+			cout<<"L:"<<my_aiocb[i].aio_nbytes<<",";
+			cout<<"blkno:"<<trace[i].blkno<<",";
+			cout<<"offset:"<<my_aiocb[i].aio_offset<<endl;
+		}
+
 //                  my_aiocb[i].aio_sigevent.sigev_notify =	SIGEV_THREAD;
 //			my_aiocb[i].aio_sigevent.sigev_notify_function = callback;
 //			my_aiocb[i].aio_sigevent.sigev_notify_attributes = NULL;
-			my_data[i].number=i;
-			my_data[i].aio_req=&my_aiocb[i];
-			my_aiocb[i].aio_sigevent.sigev_value.sival_ptr = &my_data[i];
+		my_data[i].number=i;
+		my_data[i].aio_req=&my_aiocb[i];
+		my_aiocb[i].aio_sigevent.sigev_value.sival_ptr = &my_data[i];
 
-			sigaction( SIGIO, &sig_act, NULL );//add by maobo
+		sigaction( SIGIO, &sig_act, NULL );//add by maobo
 
 	}
 	double temp_time;
@@ -725,15 +741,59 @@ void do_io()
 	start=get_time();
 	while(i < total&& *exit_code==10)
 	{
+		if(schemes_type == 0)
+			mid_str = trace[i].fingerprint;
+		else if(schemes_type == 1)
+			mid_str = trace[i].bchcode;
+		else{
+			printf("Error schems type!\n");
+			exit(0);
+		}
 		if((temp_time=(get_time()-start))>=(trace[i].time))
 			//	if((temp_time=(get_time()-start))>i*0.05)
 		{
 			my_time[i].start_time=temp_time;
-			if(trace[i].flag)
-			{
+
+				if (trace[i].flag) {
+					++ write_num;
+					if(trace_type == 1 || trace_type == 2) {
+					if (schemes_type == 0) {
+						if (hash_container[mid_str] == 0) {
+							++ no_replicate;
+							hash_container[mid_str]++;
+							aio_write64(&my_aiocb[i]);
+						} else if (hash_container[mid_str] > 0) {
+							hash_container[mid_str]++;
+							my_time[i].end_time = get_time()-start;
+						} else {
+							printf("Error reference count!\n");
+							exit(0);
+						}
+					} else if (schemes_type == 1) {
+						if (bch_container[mid_str] == 0) {
+							++ no_replicate;
+							bch_container[mid_str]++;
+							aio_write64(&my_aiocb[i]);
+						} else if (bch_container[mid_str] > 0) {
+							bch_container[mid_str]++;
+							aio_read64(&my_aiocb[i]);
+						} else {
+							printf("Error reference count!\n");
+							exit(0);
+						}
+					} else {
+						printf("Error schems type!\n");
+						exit(0);
+					}
+				}
+			else if(trace_type == 0) {
 				aio_write64(&my_aiocb[i]);
-				my_time[i].flag=1;
+				my_time[i].flag = 1;
+			} else{
+				printf("Error trace type!\n");
+				exit(0);
 			}
+		}
 			else
 			{
 				aio_read64(&my_aiocb[i]);
@@ -750,9 +810,9 @@ void do_io()
 }
 
 /*function deal with the test result*/
- void deal_by_time(void)
- {
- 	FILE *fp;
+void deal_by_time(void)
+{
+	FILE *fp;
 // 	int n=(int)my_time[total-1].end_time/deal_time+1;
 	int n =(int) (trace_end_time - start)/deal_time +1;
 	int *n_of_ti=(int *)(malloc(sizeof(int)*n));
@@ -800,81 +860,110 @@ void do_io()
 			(n_of_ti[i]==0?0:(int)(1/(time_temp/n_of_ti[i]))),
 			n_of_ti[i]==0?0:(int)(block_count[i]*BLOCK_SIZE/1024.0/time_temp));*/
 		fprintf(fp,"%4d--%4d      %5d           %4.6lf           %10d     %10d\n",
-			(int)(endt-deal_time),
-			(int)(endt),  n_of_ti[i],
-			n_of_ti[i]==0?0:(time_use[i]*1000/n_of_ti[i]),
-			(n_of_ti[i]==0?0:(int)(1/(time_temp/n_of_ti[i]))),
-			n_of_ti[i]==0?0:(int)(block_count[i]*BLOCK_SIZE/1024.0/time_temp));
+						(int)(endt-deal_time),
+						(int)(endt),  n_of_ti[i],
+						n_of_ti[i]==0?0:(time_use[i]*1000/n_of_ti[i]),
+						(n_of_ti[i]==0?0:(int)(1/(time_temp/n_of_ti[i]))),
+						n_of_ti[i]==0?0:(int)(block_count[i]*BLOCK_SIZE/1024.0/time_temp));
 	}
 	fclose(fp);
- }
+}
 
- void deal_by_num()
- {
-	 FILE *fp;
-	 int n=total/deal_num+1;
-	 int *num=(int *)(malloc(sizeof(int)*n));
-	 double *time_use=(double *)(malloc(sizeof(double)*n));
-	 long *block_count=(long *)(malloc(sizeof(long)*n));
-	 char file_name[255];
-	 int i=0;
-	 for(i=0; i<n; i++)
-	 {
-	 	time_use[i]=0;
+void deal_by_num()
+{
+	FILE *fp;
+	int n=total/deal_num+1;
+	int *num=(int *)(malloc(sizeof(int)*n));
+	double *time_use=(double *)(malloc(sizeof(double)*n));
+	double total_time = 0.0;
+	long *block_count=(long *)(malloc(sizeof(long)*n));
+	char file_name[255];
+	int i=0;
+	for(i=0; i<n; i++)
+	{
+		time_use[i]=0;
 		num[i]=0;
 		block_count[i]=0;
-	 }
-	 for (i=0; i<total; i++)
-	 {
-		 time_use[i/deal_num]+=my_time[i].elpsd_time;
-		 num[i/deal_num]++;
-		 block_count[i/deal_num]+=trace[i].blkcount;
-	 }
-	 strcpy(file_name,result_file_name);
-	 strcat(file_name,".num");
-	 cout<<"result is saved in "<<file_name<<endl;
-	 if((fp=fopen(file_name,((deal_time)?"a":"w")))==NULL)
-  	 {
-		 printf("open result file error!\n");
-		 exit(0);
- 	 }
+	}
+	for (i=0; i<total; i++)
+	{
+		time_use[i/deal_num]+=my_time[i].elpsd_time;
+		num[i/deal_num]++;
+		block_count[i/deal_num]+=trace[i].blkcount;
+		total_time+=my_time[i].elpsd_time;
+	}
+	strcpy(file_name,result_file_name);
+	strcat(file_name,".num");
+	cout<<"result is saved in "<<file_name<<endl;
+	if((fp=fopen(file_name,((deal_time)?"a":"w")))==NULL)
+	{
+		printf("open result file error!\n");
+		exit(0);
+	}
 //	 printf("\n*******************************result(by number)*******************************\n");
 //	 printf("     num          ios      average time(ms)    ios per sec(io/s)    spend(kb/s)\n");
-	 fprintf(fp,"\n*****************************result(by number)********************************\n");
-	 fprintf(fp,"     num          ios     average time(ms)    ios per sec(io/s)    spend(kb/s)\n");
-	 if(total%deal_num==0)
-	 {
-	 	n--;
-	 }
-	 for (i=0; i<n; i++)
-	 {
-	 	 double time_temp=my_time[i*deal_num+num[i]-1].end_time-my_time[i*deal_num].start_time;
+	fprintf(fp,"\n*****************************result(by number)********************************\n");
+	fprintf(fp,"     num          ios     average time(ms)    ios per sec(io/s)    spend(kb/s)\n");
+	if(total%deal_num==0)
+	{
+		n--;
+	}
+	for (i=0; i<n; i++)
+	{
+		double time_temp=my_time[i*deal_num+num[i]-1].end_time-my_time[i*deal_num].start_time;
 /*		 printf("%5d--%5d     %4d            %4.6lf           %10d     %10d\n",
 			 i*deal_num,  (i+1)*deal_num-1,  num[i],
 			 time_use[i]/num[i]*1000,
 			 (int)(1.0/(time_temp/num[i])),
 			 (int)(block_count[i]*BLOCK_SIZE/1024.0/time_temp));*/
-		 fprintf(fp,"%5d--%5d     %4d           %4.6lf           %10d     %10d\n",
-			 i*deal_num,  (i+1)*deal_num-1,  num[i],
-			 time_use[i]/num[i]*1000,
-			 (int)(1.0/(time_temp/num[i])),
-			 (int)(block_count[i]*BLOCK_SIZE/1024.0/time_temp));
+		fprintf(fp,"%5d--%5d     %4d           %4.6lf           %10d     %10d\n",
+						i*deal_num,  (i+1)*deal_num-1,  num[i],
+						time_use[i]/num[i]*1000,
+						(int)(1.0/(time_temp/num[i])),
+						(int)(block_count[i]*BLOCK_SIZE/1024.0/time_temp));
 
-	 }
-	 fclose(fp);
+	}
+	fprintf(fp, "avg response time: %lf ms.\n", total_time/total*1000);
+	fprintf(fp, "deduplication raio is: %lf %%.\n", 100.0 * (write_num - no_replicate) / write_num);
+	fclose(fp);
 
- }
+}
 /*show help*/
- void usage(void)
- {
- 	printf("usage:%s [-t tracefilename] [-r resultfilename] [-p processnumber] [-m time] [-n number] [-p tracetype] dev\n",myname);
-		printf("      [-t tracefilename]:\n");
-		printf("      [-r resultfilename]:\n");
-		printf("      [-c raid capacity(KB)]:\n");
-		printf("      [-i timescale(default:1, faster 2+)]:\n");
-		printf("      [-a rangescale(default:0, bigger 2+)]:\n");
-		printf("      [-m deal time]:\n");
-		printf("      [-n deal number]:\n");
-		printf("      [-p trace type]:\n");
-		printf("      dev:\n");
+void usage(void)
+{
+	printf("usage:%s [-t tracefilename] [-r resultfilename] [-p processnumber] [-m time] [-n number] [-p tracetype] dev\n",myname);
+	printf("      [-t tracefilename]:\n");
+	printf("      [-r resultfilename]:\n");
+	printf("      [-c raid capacity(KB)]:\n");
+	printf("      [-i timescale(default:1, faster 2+)]:\n");
+	printf("      [-a rangescale(default:0, bigger 2+)]:\n");
+	printf("      [-m deal time]:\n");
+	printf("      [-n deal number]:\n");
+	printf("      [-p trace type]:\n");
+	printf("      dev:\n");
+}
+
+void ByteToHexStr(const unsigned char *source, char *dest, int sourceLen) {
+	short i;
+	unsigned char highByte, lowByte;
+
+	for (i = 0; i < sourceLen; i++)
+	{
+		highByte = source[i] >> 4;
+		lowByte = source[i] & 0x0f ;
+
+		highByte += 0x30;
+
+		if (highByte > 0x39)
+			dest[i * 2] = highByte + 0x07;
+		else
+			dest[i * 2] = highByte;
+
+		lowByte += 0x30;
+		if (lowByte > 0x39)
+			dest[i * 2 + 1] = lowByte + 0x07;
+		else
+			dest[i * 2 + 1] = lowByte;
+	}
+	return ;
 }
