@@ -49,4 +49,4 @@ fi
 
 PARAMETERS="$PARAMETERS $devicename"
 echo "./raidmeter$PARAMETERS"
-#sudo ./raidmeter $PARAMETERS
+sudo ./raidmeter $PARAMETERS
