@@ -539,7 +539,7 @@ unsigned long trace_stat(char *file_name, unsigned long  *max_dev_addr)
 			}
 			trace[i].time = timestamp - fiu_start_time;
 			trace[i].time = trace[i].time / timescale;
-			trace[i].blkcount = 4096 / BLOCK_SIZE;
+			trace[i].blkcount = num;
 			if(trace_type == 1) {
 				trace[i].fingerprint = (char *) malloc(257 * sizeof(char));
 				trace[i].fingerprint[256] = '\0';
