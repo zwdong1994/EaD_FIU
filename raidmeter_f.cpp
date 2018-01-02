@@ -253,14 +253,14 @@ int main(int argc,char **argv)
 						i++;
 						if(i>=argc)
 						{
-							printf("bad rangescale:\"%s\".\n",argv[i-1]);
+							printf("bad tracetype:\"%s\".\n",argv[i-1]);
 							usage();
 							exit(0);
 						}
 						trace_type = atoi(argv[i]);
 						if (rangescale<0)
 						{
-							printf("wrong rangescale!\n");
+							printf("wrong tracetype!\n");
 							exit(0);
 						}
 						break;

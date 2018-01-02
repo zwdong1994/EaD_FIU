@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Program:
 #       This program is to evaluate the performance in different traces.
 #       The parameters of this shell is same as the raidmeter.
@@ -27,12 +27,12 @@ do
         PARAMETERS="$PARAMETERS -t $tracename"
     elif [ "$option" == "resultname" ]; then
         resultname=${var#resultname=}
-        PARAMETERS="$PARAMETERS -p $resultname"
+        PARAMETERS="$PARAMETERS -r $resultname"
     elif [ "$option" == "devicename" ]; then
         devicename=${var#devicename=}
     elif [ "$option" == "capacity" ]; then
         capacity=${var#capacity=}
-        PARAMETERS="$PARAMETERS -p $capacity"
+        PARAMETERS="$PARAMETERS -c $capacity"
     else
         echo "Wrong parameters!"
         exit 1
