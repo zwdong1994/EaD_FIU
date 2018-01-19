@@ -418,7 +418,7 @@ int main(int argc,char **argv)
 
 	//cout<<total<<"	records"<<endl;
 	printf("\nbenchmark is initialized, press any character to begin the evaluation...");
-	getchar();
+	//getchar();
 
 	pid_t pid=fork();
 	if(pid==0)
