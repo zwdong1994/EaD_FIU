@@ -1,7 +1,7 @@
 /*********************************
 Trace Replay tools for research----Raidmeter
-First write by raysmile, Second modify by maobo
-----------------------------2007.11.9
+First write by raysmile, and modified by Weidong Zhu.
+----------------------------2018.1
 *****************************/
 
 #include <iostream>
