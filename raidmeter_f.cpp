@@ -19,6 +19,7 @@ First write by raysmile, and modified by Weidong Zhu.
 #include <time.h>
 #include <unistd.h>
 #include <map>
+#include <set>
 #include <stdint.h>
 #include "bch.h"
 using namespace std;
@@ -49,6 +50,7 @@ const	long	READ		=	1;
 struct bch_control *bch;
 std::map<std::string, int> hash_container;
 std::map<std::string, int> bch_container;
+std::set<std::string> sample_hash_vector;
 
 //trace struct
 typedef	struct	_io_trace
@@ -67,6 +69,7 @@ typedef	struct	_io_time
 		double	end_time;
 		double	elpsd_time;
 		unsigned int	flag;
+        int hash_flag;
 }io_time;
 
 //signal
@@ -358,6 +361,9 @@ int main(int argc,char **argv)
 		else if(schemes_type == 1){
 			printf("Use EaD algorithm!\n");
 		}
+        else if(schemes_type == 2){
+            printf("Use sample_md5 algorithm!\n");
+        }
 		else{
 			printf("Wrong schemes type!\n");
 			exit(9);
@@ -370,6 +376,9 @@ int main(int argc,char **argv)
 		else if(schemes_type == 1){
 			printf("Use EaD algorithm!\n");
 		}
+        else if(schemes_type == 2){
+            printf("Use sample_md5 algorithm!\n");
+        }
 		else{
 			printf("Wrong schemes type!\n");
 			exit(9);
@@ -580,6 +589,7 @@ unsigned long trace_stat(char *file_name, unsigned long  *max_dev_addr)
 		//	continue;
 
 
+        my_time[i].hash_flag = 0;
 
 		total_count++;
 		count_threshold--;
@@ -674,6 +684,8 @@ void aio_complete_note( int signo, siginfo_t *info, void *context )
 			/* Request completed successfully, get the return status */
 			ret = aio_return64(req->aio_req);
 			my_time[req->number].end_time=get_time()-start;
+            if(my_time[req->number].hash_flag == 1)
+                my_time[req->number].end_time = my_time[req->number].end_time + 0.013828 / 1000;
 			my_time[req->number].elpsd_time=my_time[req->number].end_time-my_time[req->number].start_time;
 //		printf("--we get here--used time =%lf---\n",my_time[req->number].elpsd_time);
 		}
@@ -687,7 +699,11 @@ void do_io()
 	int i=0;
 	struct sigaction sig_act; //add by maobo
 	int fd=open(dev_name,O_RDWR|O_LARGEFILE);
+    char mid_sample[33];
+
 	std::string mid_str;
+    std::string mid_sample_str;
+
 	if(fd==-1)
 	{
 		cout<<"open "<<dev_name<<" error!"<<endl;
@@ -741,10 +757,16 @@ void do_io()
 	start=get_time();
 	while(i < total&& *exit_code==10)
 	{
-		if(schemes_type == 0)
+		if(schemes_type == 0) //Traditional deduplication schemes
 			mid_str = trace[i].fingerprint;
-		else if(schemes_type == 1)
+		else if(schemes_type == 1) //EaD
 			mid_str = trace[i].bchcode;
+        else if(schemes_type == 2){ //sample_md5
+            mid_str = trace[i].fingerprint;
+            memcpy(mid_sample, trace[i].fingerprint, 32);
+            mid_sample[32] = '\0';
+            mid_sample_str = mid_sample;
+        }
 		else{
 			printf("Error schems type!\n");
 			exit(0);
@@ -753,11 +775,10 @@ void do_io()
 			//	if((temp_time=(get_time()-start))>i*0.05)
 		{
 			my_time[i].start_time=temp_time;
-
-				if (trace[i].flag) {
-					++ write_num;
-					if(trace_type == 1 || trace_type == 2) {
-					if (schemes_type == 0) {
+            if (trace[i].flag) {
+                ++ write_num;
+                if(trace_type == 1 || trace_type == 2) { //FIU trace.
+                    if (schemes_type == 0) {
 						if (hash_container[mid_str] == 0) {
 							++ no_replicate;
 							hash_container[mid_str]++;
@@ -781,25 +802,44 @@ void do_io()
 							printf("Error reference count!\n");
 							exit(0);
 						}
-					} else {
+					} else if(schemes_type == 2) {
+                        if( sample_hash_vector.find(mid_sample_str) != sample_hash_vector.end()){ //sample hash exist
+                            my_time[i].hash_flag = 1;
+                            if (hash_container[mid_str] == 0) {
+                                ++ no_replicate;
+                                hash_container[mid_str]++;
+                                aio_write64(&my_aiocb[i]);
+                            } else if (hash_container[mid_str] > 0) {
+                                hash_container[mid_str]++;
+                                my_time[i].end_time = get_time()-start + 0.013828 / 1000;
+                            } else {
+                                printf("Error reference count!\n");
+                                exit(0);
+                            }
+                        } else{ // sample hash not exist
+                            sample_hash_vector.insert(mid_str);
+                            ++ no_replicate;
+                            hash_container[mid_str]++;
+                            my_time[i].hash_flag = 0;
+                            aio_write64(&my_aiocb[i]);
+                        }
+
+                    } else {
 						printf("Error schems type!\n");
 						exit(0);
 					}
-				}
-			else if(trace_type == 0) {
-				aio_write64(&my_aiocb[i]);
-				my_time[i].flag = 1;
-			} else{
-				printf("Error trace type!\n");
-				exit(0);
-			}
-		}
-			else
-			{
-				aio_read64(&my_aiocb[i]);
-				my_time[i].flag=0;
-			}
-			i++;
+				} else if(trace_type == 0) {
+                    aio_write64(&my_aiocb[i]);
+                    my_time[i].flag = 1;
+                } else{
+                    printf("Error trace type!\n");
+                    exit(0);
+                }
+            } else {
+                aio_read64(&my_aiocb[i]);
+                my_time[i].flag=0;
+            }
+            i++;
 			debug4("time:",temp_time,"send req:",i-1);
 		}
 	}
