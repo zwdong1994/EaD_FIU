@@ -817,7 +817,7 @@ void do_io()
                                 exit(0);
                             }
                         } else{ // sample hash not exist
-                            sample_hash_vector.insert(mid_str);
+                            sample_hash_vector.insert(mid_sample_str);
                             ++ no_replicate;
                             hash_container[mid_str]++;
                             my_time[i].hash_flag = 0;
