@@ -432,7 +432,24 @@ int main(int argc,char **argv)
 	}
 	do_io();
 	double total_size=0;
-	double total_time=0;
+    double total_time=0;
+    sleep(5);
+    unsigned long j;
+
+    if(schemes_type == 0){ // Traditional deduplication.
+        for( j = 0; j < total; j++){
+            my_time[j].end_time = my_time[j].end_time + 0.013828 / 1000;
+            my_time[j].elpsd_time=my_time[j].end_time - my_time[j].start_time;
+        }
+    } else if(schemes_type == 2){ // Sampling deduplication.
+        for( j = 0; j < total; j++){
+            my_time[j].end_time = my_time[j].end_time + 0.003 / 1000;
+            my_time[j].elpsd_time=my_time[j].end_time - my_time[j].start_time;
+        }
+    } else{
+
+    }
+
 	for(i=0;i<total;i++)
 	{
 		total_size+=trace[i].blkcount*BLOCK_SIZE;
@@ -779,21 +796,23 @@ void do_io()
                 ++ write_num;
                 if(trace_type == 1 || trace_type == 2) { //FIU trace.
                     if (schemes_type == 0) {
-						if (hash_container[mid_str] == 0) {
+						if (hash_container[mid_str] ++) {
 							++ no_replicate;
-							hash_container[mid_str]++;
+							//hash_container[mid_str]++;
 							aio_write64(&my_aiocb[i]);
 						} else if (hash_container[mid_str] > 0) {
 							hash_container[mid_str]++;
 							my_time[i].end_time = get_time()-start;
+                            my_time[i].elpsd_time=my_time[i].end_time-my_time[i].start_time;
+
 						} else {
 							printf("Error reference count!\n");
 							exit(0);
 						}
 					} else if (schemes_type == 1) {
-						if (bch_container[mid_str] == 0) {
+						if (bch_container[mid_str] ++) {
 							++ no_replicate;
-							bch_container[mid_str]++;
+							//bch_container[mid_str]++;
 							aio_write64(&my_aiocb[i]);
 						} else if (bch_container[mid_str] > 0) {
 							bch_container[mid_str]++;
@@ -805,13 +824,14 @@ void do_io()
 					} else if(schemes_type == 2) {
                         if( sample_hash_vector.find(mid_sample_str) != sample_hash_vector.end()){ //sample hash exist
                             my_time[i].hash_flag = 1;
-                            if (hash_container[mid_str] == 0) {
+                            if (hash_container[mid_str] ++) {
                                 ++ no_replicate;
-                                hash_container[mid_str]++;
+                                //hash_container[mid_str]++;
                                 aio_write64(&my_aiocb[i]);
                             } else if (hash_container[mid_str] > 0) {
                                 hash_container[mid_str]++;
                                 my_time[i].end_time = get_time()-start + 0.013828 / 1000;
+                                my_time[i].elpsd_time=my_time[i].end_time - my_time[i].start_time;
                             } else {
                                 printf("Error reference count!\n");
                                 exit(0);
@@ -864,6 +884,12 @@ void deal_by_time(void)
 	char file_name[255];
 	int i=0,j=0;
 	printf("maobo---deal by time --n=%d--\n",n);
+
+
+
+
+
+
 	for(i=0; i<n; i++)
 	{
 		n_of_ti[i]=0;
@@ -919,6 +945,10 @@ void deal_by_num()
 	long *block_count=(long *)(malloc(sizeof(long)*n));
 	char file_name[255];
 	int i=0;
+
+
+
+
 	for(i=0; i<n; i++)
 	{
 		time_use[i]=0;
