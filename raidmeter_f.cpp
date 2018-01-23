@@ -796,9 +796,9 @@ void do_io()
                 ++ write_num;
                 if(trace_type == 1 || trace_type == 2) { //FIU trace.
                     if (schemes_type == 0) {
-						if (hash_container[mid_str] ++) {
+						if (hash_container[mid_str] == 0) {
 							++ no_replicate;
-							//hash_container[mid_str]++;
+							hash_container[mid_str]++;
 							aio_write64(&my_aiocb[i]);
 						} else if (hash_container[mid_str] > 0) {
 							hash_container[mid_str]++;
@@ -810,9 +810,9 @@ void do_io()
 							exit(0);
 						}
 					} else if (schemes_type == 1) {
-						if (bch_container[mid_str] ++) {
+						if (bch_container[mid_str] == 0) {
 							++ no_replicate;
-							//bch_container[mid_str]++;
+							bch_container[mid_str]++;
 							aio_write64(&my_aiocb[i]);
 						} else if (bch_container[mid_str] > 0) {
 							bch_container[mid_str]++;
@@ -824,9 +824,9 @@ void do_io()
 					} else if(schemes_type == 2) {
                         if( sample_hash_vector.find(mid_sample_str) != sample_hash_vector.end()){ //sample hash exist
                             my_time[i].hash_flag = 1;
-                            if (hash_container[mid_str] ++) {
+                            if (hash_container[mid_str] == 0) {
                                 ++ no_replicate;
-                                //hash_container[mid_str]++;
+                                hash_container[mid_str]++;
                                 aio_write64(&my_aiocb[i]);
                             } else if (hash_container[mid_str] > 0) {
                                 hash_container[mid_str]++;
