@@ -785,6 +785,7 @@ void do_io()
 
 	}
 	double temp_time;
+    double add_time = 0.0;
 	i=0;
 	start=get_time();
 	while(i < total&& *exit_code==10)
@@ -803,7 +804,14 @@ void do_io()
 			printf("Error schems type!\n");
 			exit(0);
 		}
-		if((temp_time=(get_time()-start))>=(trace[i].time))
+        temp_time= get_time() - start + add_time;
+        if(temp_time < trace[i].time){
+            if(trace[i].time - temp_time > 2) {
+                add_time = trace[i].time - temp_time;
+                
+            }
+        }else
+		//(temp_time >=(trace[i].time))
 			//	if((temp_time=(get_time()-start))>i*0.05)
 		{
 			my_time[i].start_time=temp_time;
