@@ -438,13 +438,17 @@ int main(int argc,char **argv)
 
     if(schemes_type == 0){ // Traditional deduplication.
         for( j = 0; j < total; j++){
-            my_time[j].end_time = my_time[j].end_time + 0.013828 / 1000;
-            my_time[j].elpsd_time=my_time[j].end_time - my_time[j].start_time;
+            if(my_time[j].end_time > 0) {
+                my_time[j].end_time = my_time[j].end_time + 0.013828 / 1000;
+                my_time[j].elpsd_time = my_time[j].end_time - my_time[j].start_time;
+            }
         }
     } else if(schemes_type == 2){ // Sampling deduplication.
         for( j = 0; j < total; j++){
-            my_time[j].end_time = my_time[j].end_time + 0.003 / 1000;
-            my_time[j].elpsd_time=my_time[j].end_time - my_time[j].start_time;
+            if(my_time[j].end_time > 0) {
+                my_time[j].end_time = my_time[j].end_time + 0.003 / 1000;
+                my_time[j].elpsd_time = my_time[j].end_time - my_time[j].start_time;
+            }
         }
     } else{
 
@@ -702,7 +706,7 @@ void aio_complete_note( int signo, siginfo_t *info, void *context )
 			ret = aio_return64(req->aio_req);
 			my_time[req->number].end_time=get_time()-start;
             if(my_time[req->number].hash_flag == 1)
-                my_time[req->number].end_time = my_time[req->number].end_time + 0.013828 / 1000;
+                my_time[req->number].end_time = my_time[req->number].end_time + (0.013828 / 1000);
 			my_time[req->number].elpsd_time=my_time[req->number].end_time-my_time[req->number].start_time;
 //		printf("--we get here--used time =%lf---\n",my_time[req->number].elpsd_time);
 		}
