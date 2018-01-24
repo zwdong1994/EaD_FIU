@@ -573,13 +573,12 @@ unsigned long trace_stat(char *file_name, unsigned long  *max_dev_addr)
 			}
 			trace[i].time = timestamp - fiu_start_time;
 			trace[i].time = trace[i].time / timescale;
-
-            if(i > 0){
+/*            if(i > 0){
                 if(trace[i].time - trace[i-1].time > 2)
                     delete_time += 1.8;
             }
-            trace[i].time -= delete_time;
-
+            trace[i].time = trace[i].time - delete_time;
+*/
 			trace[i].blkcount = num;
 			if(trace_type == 1) {
 				trace[i].fingerprint = (char *) malloc(257 * sizeof(char));
@@ -649,6 +648,7 @@ unsigned long trace_stat(char *file_name, unsigned long  *max_dev_addr)
 		}
 		i++;
 	}
+    printf("startstamp:%lf  end:%lf", start_timestamp, end_timestamp);
 
 	if ((end_timestamp-start_timestamp)>0)
 	{
