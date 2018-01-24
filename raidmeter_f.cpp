@@ -627,7 +627,7 @@ unsigned long trace_stat(char *file_name, unsigned long  *max_dev_addr)
 		count_threshold--;
 
 		if(total_count==1)
-			start_timestamp=timestamp;
+			start_timestamp=trace[i].time;
 
 		end_timestamp=trace[i].time;
 
