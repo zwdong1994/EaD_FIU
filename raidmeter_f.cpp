@@ -629,7 +629,7 @@ unsigned long trace_stat(char *file_name, unsigned long  *max_dev_addr)
 		if(total_count==1)
 			start_timestamp=timestamp;
 
-		end_timestamp=timestamp;
+		end_timestamp=trace[i].time;
 
 		if(op_code=='R'||op_code=='r') {
 			read_count++;
