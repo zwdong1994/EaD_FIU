@@ -440,15 +440,17 @@ int main(int argc,char **argv)
         for( j = 0; j < total; j++){
             if(my_time[j].end_time > 0) {
                 my_time[j].end_time = my_time[j].end_time + 0.013828 / 1000;
-                my_time[j].elpsd_time = my_time[j].end_time - my_time[j].start_time;
+                //my_time[j].elpsd_time = my_time[j].end_time - my_time[j].start_time;
             }
+            my_time[j].elpsd_time = my_time[j].elpsd_time + 0.013828 / 1000;
         }
     } else if(schemes_type == 2){ // Sampling deduplication.
         for( j = 0; j < total; j++){
             if(my_time[j].end_time > 0) {
                 my_time[j].end_time = my_time[j].end_time + 0.003 / 1000;
-                my_time[j].elpsd_time = my_time[j].end_time - my_time[j].start_time;
+                //my_time[j].elpsd_time = my_time[j].end_time - my_time[j].start_time;
             }
+            my_time[j].elpsd_time = my_time[j].elpsd_time + 0.003 / 1000;
         }
     } else{
 
