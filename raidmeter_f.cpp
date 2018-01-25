@@ -718,7 +718,7 @@ void aio_complete_note( int signo, siginfo_t *info, void *context )
 		if (aio_error64(req->aio_req) == 0) {
 			/* Request completed successfully, get the return status */
 			ret = aio_return64(req->aio_req);
-			my_time[req->number].end_time=get_time()-start;
+			my_time[req->number].end_time=get_time()-start + my_time[req->number].move_time;
             if(my_time[req->number].hash_flag == 1)
                 my_time[req->number].end_time = my_time[req->number].end_time + (0.013828 / 1000);
 			my_time[req->number].elpsd_time=my_time[req->number].end_time-my_time[req->number].start_time;
