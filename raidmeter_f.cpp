@@ -52,6 +52,8 @@ std::map<std::string, int> hash_container;
 std::map<std::string, int> bch_container;
 std::set<std::string> sample_hash_vector;
 
+double add_time = 0.0;
+
 //trace struct
 typedef	struct	_io_trace
 {
@@ -68,6 +70,7 @@ typedef	struct	_io_time
 		double	start_time;
 		double	end_time;
 		double	elpsd_time;
+        double  move_time;
 		unsigned int	flag;
         int hash_flag;
 }io_time;
@@ -785,7 +788,7 @@ void do_io()
 
 	}
 	double temp_time;
-    double add_time = 0.0;
+
 	i=0;
 	start=get_time();
 	while(i < total&& *exit_code==10)
@@ -806,8 +809,8 @@ void do_io()
 		}
         temp_time= get_time() - start + add_time;
         if(temp_time < trace[i].time){
-            if(trace[i].time - temp_time > 1) {
-                add_time = trace[i].time - temp_time - 0.1;
+            if(trace[i].time - temp_time > 0.5) {
+                add_time = trace[i].time - temp_time  + add_time;
 
             }
         }else
@@ -822,10 +825,11 @@ void do_io()
 						if (hash_container[mid_str] == 0) {
 							++ no_replicate;
 							hash_container[mid_str]++;
+                            my_time[i].move_time = add_time;
 							aio_write64(&my_aiocb[i]);
 						} else if (hash_container[mid_str] > 0) {
 							hash_container[mid_str]++;
-							my_time[i].end_time = get_time()-start;
+							my_time[i].end_time = get_time()-start+add_time;
                             my_time[i].elpsd_time=my_time[i].end_time-my_time[i].start_time;
 
 						} else {
@@ -836,9 +840,11 @@ void do_io()
 						if (bch_container[mid_str] == 0) {
 							++ no_replicate;
 							bch_container[mid_str]++;
+                            my_time[i].move_time = add_time;
 							aio_write64(&my_aiocb[i]);
 						} else if (bch_container[mid_str] > 0) {
 							bch_container[mid_str]++;
+                            my_time[i].move_time = add_time;
 							aio_read64(&my_aiocb[i]);
 						} else {
 							printf("Error reference count!\n");
@@ -850,10 +856,11 @@ void do_io()
                             if (hash_container[mid_str] == 0) {
                                 ++ no_replicate;
                                 hash_container[mid_str]++;
+                                my_time[i].move_time = add_time;
                                 aio_write64(&my_aiocb[i]);
                             } else if (hash_container[mid_str] > 0) {
                                 hash_container[mid_str]++;
-                                my_time[i].end_time = get_time()-start + 0.013828 / 1000;
+                                my_time[i].end_time = get_time()-start + 0.013828 / 1000 +add_time;
                                 my_time[i].elpsd_time=my_time[i].end_time - my_time[i].start_time;
                             } else {
                                 printf("Error reference count!\n");
@@ -864,6 +871,7 @@ void do_io()
                             ++ no_replicate;
                             hash_container[mid_str]++;
                             my_time[i].hash_flag = 0;
+                            my_time[i].move_time = add_time;
                             aio_write64(&my_aiocb[i]);
                         }
 
@@ -872,6 +880,7 @@ void do_io()
 						exit(0);
 					}
 				} else if(trace_type == 0) {
+                    my_time[i].move_time = add_time;
                     aio_write64(&my_aiocb[i]);
                     my_time[i].flag = 1;
                 } else{
@@ -879,6 +888,7 @@ void do_io()
                     exit(0);
                 }
             } else {
+                my_time[i].move_time = add_time;
                 aio_read64(&my_aiocb[i]);
                 my_time[i].flag=0;
             }
