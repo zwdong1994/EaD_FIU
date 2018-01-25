@@ -810,7 +810,7 @@ void do_io()
         temp_time= get_time() - start + add_time;
         if(temp_time < trace[i].time){
             if(trace[i].time - temp_time > 0.5) {
-                add_time = trace[i].time - temp_time  + add_time;
+                add_time = trace[i].time - temp_time -0.1 + add_time;
 
             }
         }else
