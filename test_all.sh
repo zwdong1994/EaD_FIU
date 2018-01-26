@@ -14,9 +14,9 @@ fi
 
 #sudo bash single_evaluation.sh dedupschems=1 tracetype=1 tracename=homes_500000.trace resultname=${OUTPUT_FOLDER}/homes.EaD capacity=100 devicename=/dev/nvme0n1
 
-sudo bash single_evaluation.sh dedupschems=0 tracetype=2 tracename=web_50000.trace resultname=${OUTPUT_FOLDER}/web.traditional capacity=100 devicename=/dev/nvme0n1
+sudo bash single_evaluation.sh dedupschems=0 tracetype=2 tracename=web_50000.trace resultname=${OUTPUT_FOLDER}/web.traditional.50000 capacity=100 devicename=/dev/nvme0n1
 
-sudo bash single_evaluation.sh dedupschems=1 tracetype=2 tracename=web_50000.trace resultname=${OUTPUT_FOLDER}/web.EaD capacity=100 devicename=/dev/nvme0n1
+sudo bash single_evaluation.sh dedupschems=1 tracetype=2 tracename=web_50000.trace resultname=${OUTPUT_FOLDER}/web.EaD.50000 capacity=100 devicename=/dev/nvme0n1
 
 #sudo bash single_evaluation.sh dedupschems=0 tracetype=2 tracename=mail_500000.trace resultname=${OUTPUT_FOLDER}/mail.traditional capacity=100 devicename=/dev/nvme0n1
 
@@ -24,6 +24,6 @@ sudo bash single_evaluation.sh dedupschems=1 tracetype=2 tracename=web_50000.tra
 
 #sudo bash single_evaluation.sh dedupschems=2 tracetype=1 tracename=homes_500000.trace resultname=${OUTPUT_FOLDER}/homes.sample capacity=100 devicename=/dev/nvme0n1
 
-sudo bash single_evaluation.sh dedupschems=2 tracetype=2 tracename=web_50000.trace resultname=${OUTPUT_FOLDER}/web.sample capacity=100 devicename=/dev/nvme0n1
+sudo bash single_evaluation.sh dedupschems=2 tracetype=2 tracename=web_50000.trace resultname=${OUTPUT_FOLDER}/web.sample.50000 capacity=100 devicename=/dev/nvme0n1
 
 #sudo bash single_evaluation.sh dedupschems=2 tracetype=2 tracename=mail_500000.trace resultname=${OUTPUT_FOLDER}/mail.sample capacity=100 devicename=/dev/nvme0n1
