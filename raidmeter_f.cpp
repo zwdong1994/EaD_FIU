@@ -676,7 +676,7 @@ int trace_reader()
 	int i=0;
 	for(; i < total; i++) {
 		trace[i].blkno = (unsigned long) (trace[i].blkno * rangescale);
-		trace[i].blkno = (trace[i].blkno * 8) / 8;
+		trace[i].blkno = (trace[i].blkno / 8) * 8;
 	}
 	return i;
 }
