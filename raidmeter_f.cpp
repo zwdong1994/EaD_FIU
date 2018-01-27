@@ -763,7 +763,7 @@ void do_io()
 		my_aiocb[i].aio_nbytes = trace[i].blkcount*BLOCK_SIZE;
 		my_aiocb[i].aio_offset = trace[i].blkno*BLOCK_SIZE;
 
-        if(my_aiocb[i].aio_nbytes > dev_size + 1024){
+        if(my_aiocb[i].aio_offset > dev_size + 1024){
             std::cout << "Error address!" << std::endl;
         }
 
@@ -773,6 +773,7 @@ void do_io()
 		my_aiocb[i].aio_sigevent.sigev_notify = SIGEV_SIGNAL;
 		my_aiocb[i].aio_sigevent.sigev_signo = SIGIO;
 
+        std::cout << "blk_num:" << trace[i].blkno << " offset: " << my_aiocb[i].aio_offset << std::endl;
 
 		//link callback
 		if(i<1) {
