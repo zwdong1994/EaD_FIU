@@ -850,7 +850,9 @@ void do_io()
 						} else if (bch_container[mid_str] > 0) {
 							bch_container[mid_str]++;
                             my_time[i].move_time = add_time;
-							aio_read64(&my_aiocb[i]);
+							//aio_read64(&my_aiocb[i]);
+                            my_time[i].end_time = get_time()-start + 0.007131 / 1000 +add_time;
+                            my_time[i].elpsd_time=my_time[i].end_time - my_time[i].start_time;
 						} else {
 							printf("Error reference count!\n");
 							exit(0);
