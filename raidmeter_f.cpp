@@ -763,6 +763,10 @@ void do_io()
 		my_aiocb[i].aio_nbytes = trace[i].blkcount*BLOCK_SIZE;
 		my_aiocb[i].aio_offset = trace[i].blkno*BLOCK_SIZE;
 
+        if(my_aiocb[i].aio_nbytes > dev_size + 1024){
+            std::cout << "Error address!" << std::endl;
+        }
+
 		sigemptyset(&sig_act.sa_mask);//add by maobo
 		sig_act.sa_flags = SA_SIGINFO;
 		sig_act.sa_sigaction = aio_complete_note;
