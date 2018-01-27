@@ -990,10 +990,10 @@ void deal_by_num()
 	}
 	for (i=0; i<total; i++)
 	{
-        std::cout << "start time: " << my_time[i].start_time << " end time: " <<
+    /*    std::cout << "start time: " << my_time[i].start_time << " end time: " <<
                   my_time[i].end_time << "elpsd time: " << my_time[i].elpsd_time <<
                   std::endl;
-		time_use[i/deal_num]+=my_time[i].elpsd_time;
+*/		time_use[i/deal_num]+=my_time[i].elpsd_time;
 		num[i/deal_num]++;
 		block_count[i/deal_num]+=trace[i].blkcount;
 		total_time+=my_time[i].elpsd_time;
