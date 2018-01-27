@@ -773,7 +773,7 @@ void do_io()
 		my_aiocb[i].aio_sigevent.sigev_notify = SIGEV_SIGNAL;
 		my_aiocb[i].aio_sigevent.sigev_signo = SIGIO;
 
-        std::cout << "blk_num:" << trace[i].blkno << " offset: " << my_aiocb[i].aio_offset << std::endl;
+//        std::cout << "blk_num:" << trace[i].blkno << " offset: " << my_aiocb[i].aio_offset << std::endl;
 
 		//link callback
 		if(i<1) {
