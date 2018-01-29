@@ -851,7 +851,7 @@ void do_io()
 							bch_container[mid_str]++;
                             my_time[i].move_time = add_time;
 							//aio_read64(&my_aiocb[i]);
-                            my_time[i].end_time = get_time()-start + 0.007131 / 1000 +add_time;
+                            my_time[i].end_time = get_time()-start + 0.007131 / 1000 +add_time; //read
                             my_time[i].elpsd_time=my_time[i].end_time - my_time[i].start_time;
 						} else {
 							printf("Error reference count!\n");
@@ -876,7 +876,7 @@ void do_io()
                         } else{ // sample hash not exist
                             sample_hash_vector.insert(mid_sample_str);
                             ++ no_replicate;
-                            hash_container[mid_str]++;
+                            //hash_container[mid_str]++;
                             my_time[i].hash_flag = 0;
                             my_time[i].move_time = add_time;
                             aio_write64(&my_aiocb[i]);
